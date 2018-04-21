@@ -30,22 +30,22 @@ NOTE:
 The script reports the effectiveness of the optimization on screen and
 with the following return codes:
 
-|   | value |   | description                                               |   |
-|   | ===== |   | ========================================================= |   |
-|   | 0     |   | original < optimized                                      |   |
-|   | 1     |   | original = optimized                                      |   |
-|   | 2     |   | original > optimized                                      |   |
-|   | 3     |   | original file does not exist                              |   |
-|   | 4     |   | optimized file does not exist, ie optimization failed     |   |
-|   | 5     |   | other error / bug                                         |   |
+| value | description                                               |
+| ----: | :-------------------------------------------------------- |
+| 0     | original < optimized                                      |
+| 1     | original = optimized                                      |
+| 2     | original > optimized                                      |
+| 3     | original file does not exist                              |
+| 4     | optimized file does not exist, ie optimization failed     |
+| 5     | other error / bug                                         |
 
 
 ## Outputs
 
-|   | descriptor |   | description                                             |   |
-|   | ========== |   |                                                         |   |
-|   | stdout     | 1 | screen optimized output                                 |   |
-|   | stderr     | 2 | errors reported by optimize function (ie effectiveness) |   |
+| descriptor | # | description                                             |
+| ---------: | - | ------------------------------------------------------  |
+| stdout     | 1 | screen optimized output                                 |
+| stderr     | 2 | errors reported by optimize function (ie effectiveness) |
 
 For analyzing and/or logging purposes the `-c|--csvfile PATH` argument
 may be used to save raw csv formatted record to a file specified:
