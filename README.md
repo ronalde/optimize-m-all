@@ -3,8 +3,10 @@
 `optimize-m-all` is a bash script to perform lossless optimization and
 optionally (re-)compression of image files.
 
-The script is designed to be used in conjunction with GNU find and GNU
-parallel to do (massive) batch jobs.
+The script is designed to be used in conjunction with [GNU
+find](https://www.gnu.org/software/findutils/manual/html_mono/find.html)
+and [GNU parallel](https://www.gnu.org/software/parallel/) to do
+(massive) batch jobs.
 
 
 ## Usage
@@ -31,6 +33,7 @@ done
 Run `do_compress --help` or show usage information, or use `-p` to see
 examples for using the script with GNU parallel.
 
+
 ## File formats and requirements
 
 `optimize-m-all` handles the following image formats with the tools
@@ -40,13 +43,12 @@ listed:
 - `gif`:  `gifsicle` (https://www.lcdf.org/gifsicle/)
 - `jpeg`: `jpegtrans` (https://github.com/mozilla/mozjpeg):
 
-NOTE:
-  with the `-r QVAL` or `--recompress QVAL` argument, `identify` (from
-  imagemagick) is used on the jpeg inputfile to check its compression
-  ratio (`'Q'`uality level);
-- when that exceeds QVAL `convert` from imagemagick is used to perform
-  lossy re-compression (and optimization),
-- otherwise `jpegtrans` is used losslessly.
+  NOTE: with the `-r QVAL` or `--recompress QVAL` argument, `identify`
+  (from imagemagick) is used on the jpeg inputfile to check its
+  compression ratio (`'Q'`uality level);
+  - when that exceeds QVAL `convert` from imagemagick is used to
+    perform lossy re-compression (and optimization),
+  - otherwise `jpegtrans` is used losslessly.
 
 
 ## Exit/Return values
