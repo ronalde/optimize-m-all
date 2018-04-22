@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-## lossless optimize graphic inputfile $1 to outputfile $2
+## lossless optimize image file $1 to $2
 ##
 ##  Copyright (C) 2018 Ronald van Engelen <ronalde+github@lacocina.nl>
 ##  This program is free software: you can redistribute it and/or modify
@@ -15,91 +15,40 @@
 ##  You should have received a copy of the GNU General Public License
 ##  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ##
-## Source:    https://github.com/ronalde/optimize-m-all
-## See also:  https://lacocina.nl/free-parallel-lossless-web-image-optimalization
-##            README.md  
+## Source: https://github.com/ronalde/optimize-m-all
+## See:    README.md
+##         https://lacocina.nl/free-parallel-lossless-web-image-optimalization
+##         
 
 LANG=C
 LC_NUMERIC=C
 
 appname="optimize-m-all"
-appversion="0.0.2"
+appversion="0.0.3"
 
-## leave checking availability up to wrapper script
+## leave checking the availability of commands up to a wrapper script
 cmd_gifsicle="${cmd_gifsicle:-gifsicle}"
 cmd_optipng="${cmd_optipng:-optipng}"
 cmd_jpegtran="${cmd_jpegtran:-jpegtran}"
 cmd_convert="${cmd_convert:-convert}"
 cmd_identify="${cmd_identify:-identify}"
 
-## - jpegtran arguments
-## 1)  do lossless optimization using Trellis quantization maximizing
-##     quality/filesize ratio.
+## see README.md for documentation and argumentation for the default
+## settings for the various encoders.
+
 jpegtran_args=(-optimize)
-## 2) encode progressive with jpegrescan optimization. 
-##    TODO: maybe depend on image size; ie <10KB do regular baseline
-##    encoding?
 jpegtran_args+=(-progressive)
-## 3) determine which metadata blocks to keep; any of (in order of
-##    increasing potential file size reduction and/or potential
-##    quality loss due to stripping color space info): all, comments,
-##    none
 jpegtran_args+=(-copy "all")
-## 
-## - imagemagick convert arguments
-## 1) see remarks on jpegtrans copy argument above
+identify_args=(-format '%Q')
 convert_args=(-strip)
-## 2) seems like a good requantisation filter
+convert_args+=(-interlace "plane")
 convert_args+=(-define "jpeg:dct-method=float")
-## 3) progressive encoding
-convert_args+=(-interlace "Plane")
-## 
-## - optipng arguments
-## 1) preserve file attributes
+convert_args+=(-sampling-factor "4:2:2")
+convert_args+=(-define "jpeg:optimize-coding=on")
 optipng_args=(-preserve)
-## 2) overwrite the existing output and backup files.
 optipng_args+=(-clobber)
-## 
-## - gifsicle arguments
-##  1) optimize level 3 combines
-##     1) stores only the changed portion of each image,
-##     2) use transparency to shrink the file further, and
-##     3) try several optimization methods (usually slower, sometimes
-##        better results).
 gifsicle_args=(--optimize=3)
 
-function help_parallel() {
-    msg_usage="\
-${appname} is designed to be used together with GNU find and parallel.
-
-For example, to optimize all images in the directory \`/tmp/test/in'
-and save the resulting images to the directory \`/tmp/test/out' one
-might use:
-
- sourcedir=\"/tmp/test/in\"
- targetdir=\"/tmp/test/out\"
- find \"\${sourcedir}\" -type f -print0 | parallel -0 ${appname} -i {} -o \${targetdir}{}
-
- Result:
- /tmp/test/in/some/sub/dir/image001.jpg => /tmp/test/out/some/sub/dir/image001.jpg
-
-Naming of the target file name and path can be easily manipulated
-using parallels '{}' switches.
-For example, flatten the directory structure of the target directory:
- find \"\${sourcedir}\" -type f -print0 | parallel -0 ${appname} -i {} -o \${targetdir}{/}
-
- Result:
- /tmp/test/in/some/sub/dir/image001.jpg => /tmp/test/out/image001.jpg
-
-Or, add an extra suffix to the output files:
- find \"\${sourcedir}\" -type f -print0 | parallel -0 ${appname} -i {} -o \${targetdir}{/.}.optimized
-
- Result:
- /tmp/test/in/some/sub/dir/image001.jpg => /tmp/test/out/image001.jpg.optimized
-
-"
-    printf 1>&2 "%s\n" "${msg_usage}"
-}
 
 function display_usageinfo() {
     msg_usage="\
@@ -107,8 +56,8 @@ function display_usageinfo() {
              [-r|--recompress QVAL] \\
              [-n|--dryrun] [-f|--force] \\
              [-w|--wide] [-h|--humanize] \\
-             [-d|--debug]
-             [-p|--help-parallel]
+             [-d|--debug] \\ 
+	     [--help]
 
 ${appname} is a bash script to perform lossless optimalization and
 optionally (re)compression of jpeg, png and gif images.
@@ -137,10 +86,9 @@ OPTIONAL ARGUMENTS
                           output.
   -h|--humanize		  Uses humanized labels for the screen output
                           of sizes (ie 1024 to 1.0KiB).
-  -p|--help-parallel      Display usage information for using the
-                          script with GNU parallel.
   -d|--debug              Display lots of info.
 
+See README.md for more information.
 "
     printf 1>&2 "%s\n" "${msg_usage}"
 }
@@ -171,7 +119,7 @@ function optimize_image() {
     if [[ -f "${outputfile}" ]] && [[ "${arg_force}x" == "x" ]]; then
 	printf 1>&2 "${t_err_output_overwrite}" \
 		    "${inputfile}" "${outputfile}"
-	return 1
+	return ${err_output_overwrite}
     fi
     if [[ "${inputfile}x" != "${outputfile}x" ]]; then
 	outputpath="$(realpath -m "${outputfile}")"
@@ -202,12 +150,15 @@ function optimize_image() {
 	image/png)
 	    filetype="png"
 	    action="png_optimize" ;;
-	image/jpeg|image/jpg)
+	image/jpeg|image/jpg|image/jpe|image/jfif|image/jfif|image/jif)
 	    filetype="jpg"
 	    action="jpg_optimize"
 	    if (( max_jpeg_quality > 0 )); then
-		jpeg_quality="$(${cmd_identify} -format '%Q' "${inputfile}" 2>/dev/null)" 
+		jpeg_quality="$(${cmd_identify} "${identify_args[@]}" "${inputfile}" 2>/dev/null)" 
 		if (( jpeg_quality > max_jpeg_quality )); then
+		    [[ "${arg_debug}x" != "x" ]] && \
+     			printf 1>&2 "%s: jpeg quality %s exceeds max_jpeg_quality %s; recompressing using %s\n" \
+				    "${inputfile}" "${jpeg_quality}" "${max_jpeg_quality}" "${cmd_convert}"
 		    action="jpg_recompress"
 		fi
 	    fi
@@ -238,7 +189,7 @@ function optimize_image() {
 		[[ "${arg_dryrun}x" != "x" ]] && return ${err_dryrun}
 	    fi
 	    if ! ${cmd_gifsicle} "${gifsicle_args[@]}" "${inputfile}" > "${outputfile}"  2>/dev/null; then
-		return ${err_cmd_gifsicle}
+		return $(( $? + err_cmd_gifsicle ))
 	    fi
 	    ;;
 	png_optimize)
@@ -256,26 +207,26 @@ function optimize_image() {
 		[[ "${arg_dryrun}x" != "x" ]] && return ${err_dryrun}
 	    fi
 	    if ! ${cmd_optipng} "${optipng_args[@]}" "${inputfile}" 2>/dev/null; then
-		return ${err_cmd_optipng}
+		return return $(( $? + err_cmd_optipng ))
 	    fi
 	    ;;
 	jpg_recompress)
 	    ## additional arguments
+	    ## see README.md for more information
 	    convert_args+=(-quality "${max_jpeg_quality}")
-	    [[ "${arg_debug}x" != "x" ]] && \
-		printf 1>&2 "%s: jpeg quality %s exceeds max_jpeg_quality %s; recompressing using %s\n" \
-			"${inputfile}" "${jpeg_quality}" "${max_jpeg_quality}" "${cmd_convert}"
 	    if [[ "${arg_dryrun}x" != "x" ]] || [[ "${arg_debug}x" != "x" ]]; then
 		echo "${cmd_convert} ${inputfile} ${convert_args[*]} ${outputfile}"
-		[[ "${arg_dryrun}x" != "x" ]] && return ${err_dryrun}
+	    fi
+	    if [[ "${arg_dryrun}x" != "x" ]]; then
+		return ${err_dryrun}
 	    fi
 	    if ! ${cmd_convert} "${inputfile}" "${convert_args[@]}" "${outputfile}" 2>/dev/null; then
-		return ${err_cmd_convert}
+		return return $(( $? + err_cmd_convert )) 
 	    fi
 	    ;;
 	jpg_optimize)
 	    ## additional arguments
-	    if [[ "${arg_debug}x" == "x" ]]; then
+	    [[ "${arg_debug}x" == "x" ]] && \
 		jpegtran_args+=(-verbose)
 	    fi
 	    jpegtran_args+=(-outfile "${outputfile}")
@@ -284,7 +235,7 @@ function optimize_image() {
 		[[ "${arg_dryrun}x" != "x" ]] && return ${err_dryrun}
 	    fi
 	    if ! ${cmd_jpegtran} "${jpegtran_args[@]}" "${inputfile}" 2>/dev/null; then
-		return ${err_cmd_jpegtran}
+		return $(( $? + err_cmd_jpegtran ))
 	    fi
 	    
 	    ;;
@@ -315,8 +266,7 @@ function analyze_commandline_args() {
 		    shift 2
                     continue
 		else
-		    display_usageinfo
-                    return 1
+                    return ${err_usage}
 		fi
 		;;
             -o|--outputfile)
@@ -325,8 +275,7 @@ function analyze_commandline_args() {
 		    shift 2
                     continue
 		else
-		    display_usageinfo
-		    return 1
+		    return ${err_usage}
 		fi
 		;;
             -c|--csvfile)
@@ -335,8 +284,7 @@ function analyze_commandline_args() {
 		    shift 2
                     continue
 		else
-		    display_usageinfo
-		    return 1
+		    return ${err_usage}
 		fi
 		;;
             -r|--recompress)
@@ -345,8 +293,7 @@ function analyze_commandline_args() {
 		    shift 2
                     continue
 		else
-		    display_usageinfo
-		    return 1
+		    return ${err_usage}
 		fi
 		;;
 	    -w|--wide)
@@ -378,8 +325,7 @@ function analyze_commandline_args() {
 		exit
 		;;
 	    -\?|--help) 
-		display_usageinfo
-		exit
+		return ${err_usage}
 		;;
             --)
 		shift
@@ -387,8 +333,7 @@ function analyze_commandline_args() {
 		;;
 	    -?*)
 		printf 1>&2 "Notice: unknown argument \`%s' used\n\n" "$1"
-		display_usageinfo
-		exit
+		return ${err_usage}
 		;;
             *)
 		break
@@ -398,7 +343,8 @@ function analyze_commandline_args() {
 
 
 function ret_effectiveness() {
-    ## compare file size of file_original $1 against optimized file_optimized $2
+    ## compare file size of file_original $1 against optimized
+    ## file_optimized $2.
     file_original="$1"
     file_optimized="$2"
     if [[ ! -f "${file_original}" ]]; then
@@ -425,10 +371,17 @@ function ret_effectiveness() {
     percentage_reduction="$(echo "scale=2; ( ${bytes_reduction} / ${bytes_original} ) * 100" | bc )"
     ## output csv using raw size values
     if [[ ! "${arg_csvfile}x" == "x" ]]; then
+	extension="${file_original##*.}"
+	case "${extension,,}" in 
+	    gif) filetype="gif" ;;
+	    png) filetype="png" ;;
+	    jpeg|jpg|jpe|jfif|jfi|jif) filetype="jpg" ;;
+	    *) filetype="${extension}" ;;
+	esac
 	csv_sep=","
 	csv_quote='"'
 	csv_col[1]="${csv_quote}${file_original}${csv_quote}"
-	csv_col[2]="${csv_quote}${file_original##*.}${csv_quote}"
+	csv_col[2]="${csv_quote}${filetype}${csv_quote}"
 	csv_col[3]="${csv_quote}${file_optimized}${csv_quote}"
 	csv_col[4]="${bytes_original}"
 	csv_col[5]="${bytes_optimized}"
@@ -525,30 +478,42 @@ function main() {
 	declare -p 1>&2 inputfile outputfile arg_force arg_recompress arg_dryrun arg_debug
     optimize_image "${inputfile}" "${outputfile}" &>/dev/null
     case $? in
-	0|1)
+	${err_effect_positive}|${err_effect_zero})
 	    ## either the optimization succeeded or the optimized file
 	    ## already existed (and arg_force not set))
 	    ret_effectiveness "${inputfile}" "${outputfile}"
-	    return $?
+	    exit $?
 	    ;;
-	2)
-	    ## no input file or can't read
+	${err_input_file})
+	    ## input file does not exist or can't be read
 	    printf 1>&2 "${t_err_input_file}.\n" \
 			"${inputfile}"
-	    return ${err_input_file}
+	    exit ${err_input_file}
 	    ;;
-	3) ## could not create output directory
-	    printf 1>&2 "${t_err_output_mkdir}" \
-			"${inputfile}" "${outputfile}"
-	    return ${err_output_mkdir}
-	    ;;	
-	4) ## unhandled file format
+	${err_input_type})
+	    ## input file format unhandled
 	    printf 1>&2 "${t_err_input_type}" \
 			"${inputfile}" "${outputfile}"
-	    return ${err_input_type}
+	    exit ${err_input_type}
 	    ;;
+	${err_output_overwrite})
+	    ## outputfile exists and arg_force not set
+	    printf 1>&2 "${t_err_output_overwrite}" \
+			"${inputfile}" "${outputfile}"
+	    exit ${err_output_overwrite}
+	    ;;	
+	${err_output_mkdir})
+	    ## could not create output directory
+	    printf 1>&2 "${t_err_output_mkdir}" \
+			"${inputfile}" "${outputfile}"
+	    exit ${err_output_mkdir}
+	    ;;	
+	${err_usage})
+	    display_usageinfo
+	    return
+
 	*) ## bug
-	    return ${err_bug}
+	    exit ${err_bug}
 	    ;;
     esac
 }
@@ -594,12 +559,6 @@ t_err_output_overwrite=""
 
 ## return values (do_compress)
 err_dryrun=0
-err_cmd_optimize=1
-err_cmd_jpegtran=${err_cmd_optimize}
-err_cmd_convert=${err_cmd_optimize}
-err_cmd_optipng=${err_cmd_optimize}
-err_cmd_gifsicle=${err_cmd_optimize}
-err_cmd_identify=8
 ## return values (ret_effectiveness)
 err_effect_positive=0
 err_effect_zero=1
@@ -607,15 +566,23 @@ err_effect_negative=2
 err_input_file=3
 err_input_type=4
 err_output_file=5
-err_output_mkdir=6
-err_usage=10
-err_bug=11
+err_output_overwrite=6
+err_output_mkdir=7
+err_usage=8
+err_bug=9
+
+## external tools: 10 + return code of tool
+err_cmd_optimize=10
+err_cmd_jpegtran=${err_cmd_optimize} 
+err_cmd_convert=${err_cmd_optimize}
+err_cmd_optipng=${err_cmd_optimize}
+err_cmd_gifsicle=${err_cmd_optimize}
 
 s_err_input_file="no such original file"
 s_err_input_type="unhandled file format"
 s_err_output_file="no such optimized file"
-s_err_output_mkdir="unable to create output directory"
 s_err_output_overwrite="skipping optimization to existing output file"
+s_err_output_mkdir="unable to create output directory"
 ## if the script is not sourced by another script but run within its
 ## own shell call function `main'
 [[ "${BASH_SOURCE[0]:-}" != "${0}" ]] || \
