@@ -110,12 +110,11 @@ optimize-m-all -i /in/path -o /out/path -c ~/stats.csv
 1. [Chroma subsampling](https://en.wikipedia.org/wiki/Chroma_subsampling); imagemagick argument `-sampling-factor 4:2:2`: 
 
 
-| subsampling | downsampling of | Downsampling of resolution of  | net effect       | block splitting |
-| name        | luminance: Y    | chroma: Cb(lue) Cr(ed)         | on file size     | MCU size        |
-| -------     | --------------- | --------------------------     | ---------------- | --------------: |
-| 4:2:0       | none            | halved vertical and horizontal | * 1/2            | 16x16           |
-| 4:2:2       | none            | halved horizontal              | * 1/3            | 16x8            |
-| 4:4:4       | none            | none                           | * 1              | 8x8             |
+| subsampling name | downsampling of luminance: Y | Downsampling of resolution of chroma: Cb(lue) Cr(ed) | net effect on file size | block splitting MCU size |
+| ---------------: | ---------------------------: | ---------------------------------------------------: | ----------------------: | -----------------------: |
+| 4:2:0            | none                         | halved vertical and horizontal                       | 1/2                     | 16x16                    |
+| 4:2:2            | none                         | halved horizontal                                    | 1/3                     | 16x8                     |
+| 4:4:4            | none                         | none                                                 | 1                       | 8x8                      |
 
 
 2. Block splitting in Minimum Coded Units (MCU)
