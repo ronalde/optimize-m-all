@@ -7,53 +7,6 @@ The script is designed to be used in conjunction with GNU find and GNU
 parallel to do (massive) batch jobs.
 
 
-## File formats and requirements
-
-`optimize-m-all` handles the following image formats with the tools
-listed:
-
-- `png`:  `optipng`  (http://optipng.sourceforge.net/)
-- `gif`:  `gifsicle` (https://www.lcdf.org/gifsicle/)
-- `jpeg`: `jpegtrans` (https://github.com/mozilla/mozjpeg):
-
-NOTE:
-  with the `-r QVAL` or `--recompress QVAL` argument, `identify` (from
-  imagemagick) is used on the jpeg inputfile to check its compression
-  ratio (`'Q'`uality level);
-- when that exceeds QVAL `convert` from imagemagick is used to perform
-  lossy re-compression (and optimization),
-- otherwise `jpegtrans` is used losslessly.
-
-
-## Exit/Return values
-
-The script reports the effectiveness of the optimization on screen and
-with the following return codes:
-
-| value | description                                               |
-| ----: | :-------------------------------------------------------- |
-| 0     | original < optimized                                      |
-| 1     | original = optimized                                      |
-| 2     | original > optimized                                      |
-| 3     | original file does not exist                              |
-| 4     | optimized file does not exist, ie optimization failed     |
-| 5     | other error / bug                                         |
-
-
-## Outputs
-
-| descriptor | # | description                                             |
-| ---------: | - | ------------------------------------------------------  |
-| stdout     | 1 | screen optimized output                                 |
-| stderr     | 2 | errors reported by optimize function (ie effectiveness) |
-
-For analyzing and/or logging purposes the `-c|--csvfile PATH` argument
-may be used to save raw csv formatted record to a file specified:
-
-```bash
-optimize-m-all -i /in/path -o /out/path -c ~/stats.csv
-```
-
 ## Usage
 
 The script can be used from bash and even sourced, but is designed to
@@ -78,6 +31,58 @@ done
 Run `do_compress --help` or show usage information, or use `-p` to see
 examples for using the script with GNU parallel.
 
+## File formats and requirements
+
+`optimize-m-all` handles the following image formats with the tools
+listed:
+
+- `png`:  `optipng`  (http://optipng.sourceforge.net/)
+- `gif`:  `gifsicle` (https://www.lcdf.org/gifsicle/)
+- `jpeg`: `jpegtrans` (https://github.com/mozilla/mozjpeg):
+
+NOTE:
+  with the `-r QVAL` or `--recompress QVAL` argument, `identify` (from
+  imagemagick) is used on the jpeg inputfile to check its compression
+  ratio (`'Q'`uality level);
+- when that exceeds QVAL `convert` from imagemagick is used to perform
+  lossy re-compression (and optimization),
+- otherwise `jpegtrans` is used losslessly.
+
+
+## Exit/Return values
+
+The script reports the effectiveness of the optimization on screen and
+with the following return codes:
+
+| value | variable               | description                                                                   |
+| ----: | ---------------------: | :---------------------------------------------------------------------------- |
+| 0     | `err_effect_positive`  | original > optimized (positive effect)                                        |
+| 1     | `err_effect_zero`      | original = optimized (no effect)                                              |
+| 2     | `err_effect_negative`  | original < optimized (negative effect)                                        |
+| 3     | `err_input_file`       | original (input) file does not exist (anymore)                                |
+| 4     | `err_input_type`       | original (input) file is unhandled file type                                  |
+| 5     | `err_output_file`      | optimized (output) file does not exist (anymore), and/or optimization failed  |
+| 6     | `err_output_overwrite` | optimized (output) file did exit before optimization, and `arg_force` not set |
+| 7     | `err_output_mkdir`     | could not create target directory for optimized (output) file                 |
+| 8     | `err_usage`            | invalid commandline argument or argument value (or `--help` argument)         |
+| 9     | `err_bug`              | other error ie program bug                                                    |
+| >=10  | `err_cmd_optimize`     | external optimization tool failed with exit value (`x-10`)                    |
+
+
+
+## Outputs
+
+| descriptor | # | description                                             |
+| ---------: | - | ------------------------------------------------------  |
+| stdout     | 1 | screen optimized output                                 |
+| stderr     | 2 | errors reported by optimize function (ie effectiveness) |
+
+For analyzing and/or logging purposes the `-c|--csvfile PATH` argument
+may be used to save raw csv formatted record to a file specified:
+
+```bash
+optimize-m-all -i /in/path -o /out/path -c ~/stats.csv
+```
 
 ## Default settings for the optimization tools
  
@@ -94,8 +99,80 @@ examples for using the script with GNU parallel.
 
 ### convert (imagemagick) arguments
 1. `-strip`: see remarks on `jpegtrans` `copy` argument above
-2. `-define "jpeg:dct-method=float"`: seems like a good requantisation filter
-3. `-interlace "Plane"`: progressive encoding
+2. `-interlace "plane"`: use "baseline progressive" JPEG interlaced
+   encoding (instead of "baseline sequential" JPEG), use either `line`
+   or `plane`:
+	* `line = scanline: RRR...GGG...BBB...RRR...GGG...BBB...`
+	* `plane:           RRRRRR...GGGGGG...BBBBBB...`
+
+1. [Chroma subsampling](https://en.wikipedia.org/wiki/Chroma_subsampling) (`-sampling-factor hf x vf)`
+2. Block splitting in Minimum Coded Units (MCU)
+3. [DCT quantization](https://en.wikipedia.org/wiki/Quantization_(image_processing)#Quantization_matrices)
+   of blocks: first calculate DCT coefficients, than divide those
+   values with a standardized quantisation matrix, and than round to
+   integers. The rounding is lossy by introducing rounding errors
+   applied to high frequency brightness variation (luminance
+   components). The higher the precision used to round the brightness
+   values, the less the probability of visual degradation
+   becomes. Tradeoff: encoding time
+4. [Entropy encoding](https://en.wikipedia.org/wiki/Entropy_encoding)
+   (lossless): apply a run-length encoding (RLE) algorithm on each
+   block which groups similar frequencies together and inserts length
+   coding zeros, and then use Huffman coding to compress what is left
+
+1. [Chroma subsampling](https://en.wikipedia.org/wiki/Chroma_subsampling) (`-sampling-factor hf x vf)`:
+   * `4:4:4 (1x1)`: no compression
+   * `4:2:0 (2x2)`: no compression of luminance, : `filesize*-1/2`
+   * `4:2:2 (1x2)`: chroma components are sampled at half the sample
+     rate of luma: the horizontal chroma resolution is halved:
+     `filesize * -1/3` (with little to no visual difference)
+
+| subsampling | downsampling of | Downsampling of resolution of  | net effect       | block splitting |
+| name        | luminance: Y    | chroma: Cb(lue) Cr(ed)         | on file size     | MCU size        |
+| -------     | --------------- | --------------------------     | ---------------- | --------------: |
+| 4:2:0       | none            | halved vertical and horizontal | * 1/2            | 16x16           |
+| 4:2:2       | none            | halved horizontal              | * 1/3            | 16x8            |
+| 4:4:4       | none            | none                           | * 1              | 8x8             |
+
+Imagemagick supports both notations:
+* `-sampling-factor 2x1` or
+* `-sampling-factor 4:2:2` 
+
+4. `-define "jpeg:dct-method=float"`: apply quantization using
+   floating point calculations for the discrete cosine transform
+   (DCT), which is the slowest but best; other options are (in
+   incresasing speed and decreasing quality: integer and fast integer)
+
+
+
+```
+2x2,1x1,1x1  # 
+2x1,1x1,1x1  # 4:2:2  1/3 compression, no or slight quality loss 
+1x1,1x1,1x1  # 4:4:4  no compression or quality loss
+```
+
+
+#### Note on the `-quality` argument
+The default is to use the estimated quality of your input image if it
+can be determined, otherwise 92. When the quality is greater than 90,
+then the chroma channels are not downsampled. Use the `-sampling-factor`
+option to specify the factors for chroma downsampling.
+
+For the JPEG-2000 image format, quality is mapped using a non-linear
+equation to the compression ratio required by the Jasper library. This
+non-linear equation is intended to loosely approximate the quality
+provided by the JPEG v1 format. The default quality value 100, a
+request for non-lossy compression. A quality of 75 results in a
+request for 16:1 compression.
+
+The script reads the source jpeg `Q` value (using `identify`) and
+translates that to `max_jpeg_quality`; if `source Q >
+max_jpeg_quality` it add the argument:
+
+````bash
+convert_args+=(-quality "${max_jpeg_quality}")`
+```
+
 
 ### optipng arguments
 
