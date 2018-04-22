@@ -19,6 +19,8 @@ find /tmp/test -type f -print0 | \
     parallel -0 do_compress -i {} -o /path/out{}
 ```
 
+See: [More usage examples with GNU find and GNU parallel](#more-usage-examples-with-gnu-find-and-gnu-parallel)
+
 A sample bash loop:
 
 ```
@@ -87,10 +89,25 @@ optimize-m-all -i /in/path -o /out/path -c ~/stats.csv
 ```
 
 ## Default settings for the optimization tools
- 
+
+### gifsicle arguments
+
+1. `--optimize=3`: optimize level 3 combines 1) stores only the
+   changed portion of each image, 2) use transparency to shrink the
+   file further, and 3) try several optimization methods (usually
+   slower, sometimes better results).
+
+### optipng arguments
+
+1. `-preserve`: preserve file attributes
+2. `-clobber`: overwrite the existing output and backup files.
+
+
 ### jpegtran arguments
 
-1. `-optimize`: do lossless optimization using Trellis quantization maximizing quality/filesize ratio.
+1. `-optimize`: do lossless optimization using 
+   [Trellis quantization](https://en.wikipedia.org/wiki/Trellis_quantization)
+   maximizing quality/filesize ratio.
 2. `-progressive`: encode progressive with `jpegrescan` optimization
    (TODO: maybe depend on image size; ie <10KB do regular baseline
    encoding?)
@@ -100,15 +117,27 @@ optimize-m-all -i /in/path -o /out/path -c ~/stats.csv
     none
 
 ### convert (imagemagick) arguments
-1. `-strip`: see remarks on `jpegtrans` `copy` argument above
-2. `-interlace "plane"`: use "baseline progressive" JPEG interlaced
+1. `-quality` set dynamically when `-r/--recompression` is set:
+   Imagemagick convert defaults to the estimated quality ofthe input
+   image or uses `92` when the estimation fails. When the quality is
+   greater than 90, then the chroma channels are not downsampled, see
+   notes on the `-sampling-factor` argument below. The script does the
+   same before handing it over to `convert`; it uses `identify` to
+   read the source jpeg `Q` value and translates that to
+   `max_jpeg_quality`; if `source Q > max_jpeg_quality` it adds the
+   convert argument:
+
+```bash
+convert_args+=(-quality "${max_jpeg_quality}")
+```
+
+2. `-strip`: see remarks on `jpegtrans` `copy` argument above
+3. `-interlace "plane"`: use "baseline progressive" JPEG interlaced
    encoding (instead of "baseline sequential"), use either `line` or
    `plane`:
 	* `line = scanline: RRR...GGG...BBB...RRR...GGG...BBB...`
 	* `plane:           RRRRRR...GGGGGG...BBBBBB...`
-
-1. [Chroma subsampling](https://en.wikipedia.org/wiki/Chroma_subsampling);
-   imagemagick argument `-sampling-factor 4:2:2`:
+4. `-sampling-factor 4:2:2`: [Chroma subsampling](https://en.wikipedia.org/wiki/Chroma_subsampling);
 
 | subsampling name | downsampling of luminance: Y | Downsampling of resolution of chroma: Cb(lue) Cr(ed) | net effect on file size | block splitting MCU size |
 | ---------------: | ---------------------------: | ---------------------------------------------------: | ----------------------: | -----------------------: |
@@ -116,67 +145,37 @@ optimize-m-all -i /in/path -o /out/path -c ~/stats.csv
 | 4:2:2            | none                         | halved horizontal                                    | 1/3                     | 16x8                     |
 | 4:4:4            | none                         | none                                                 | 1                       | 8x8                      |
 
-2. Block splitting in Minimum Coded Units (MCU)
-3. [DCT quantization](https://en.wikipedia.org/wiki/Quantization_(image_processing)#Quantization_matrices);
-   imagemagick argument `-define "jpeg:dct-method=float"`
-   
-First calculate DCT coefficients, than divide those values with a
-standardized quantisation matrix, and than round to integers. The
-rounding is lossy by introducing rounding errors applied to high
-frequency brightness variation (luminance components). The higher the
-precision used to round the brightness values, the less the
-probability of visual degradation becomes. Tradeoff for higher
-precision: encoding time and cost.
+5. `-define "jpeg:dct-method=float"`; After applying sub saampling and
+    block splitting in Minimum Coded Units (MCU), 
+	[DCT quantization](https://en.wikipedia.org/wiki/Quantization_(image_processing)#Quantization_matrices)
+	is applied. First DCT coefficients are calculated, than those
+	values are divided with a standardized quantisation matrix, and
+	than rounded to integers. The rounding is lossy by introducing
+	rounding errors applied to high frequency brightness variation
+	(luminance components). The higher the precision used to round the
+	brightness values, the less the probability of visual degradation
+	becomes. Tradeoff for higher precision: encoding time and cost.
 
-4. [Entropy encoding](https://en.wikipedia.org/wiki/Entropy_encoding)
-   (lossless): apply a run-length encoding (RLE) algorithm on each
-   block which groups similar frequencies together and inserts length
-   coding zeros, and then use Huffman coding to compress what is left
- 
-#### Note on the `-quality` argument
-The default is to use the estimated quality of your input image if it
-can be determined, otherwise 92. When the quality is greater than 90,
-then the chroma channels are not downsampled. Use the `-sampling-factor`
-option to specify the factors for chroma downsampling.
-
-For the JPEG-2000 image format, quality is mapped using a non-linear
-equation to the compression ratio required by the Jasper library. This
-non-linear equation is intended to loosely approximate the quality
-provided by the JPEG v1 format. The default quality value 100, a
-request for non-lossy compression. A quality of 75 results in a
-request for 16:1 compression.
-
-The script reads the source jpeg `Q` value (using `identify`) and
-translates that to `max_jpeg_quality`; if `source Q >
-max_jpeg_quality` it add the argument:
-
-```bash
-convert_args+=(-quality "${max_jpeg_quality}")
-```
+   The last step in the JPEG encoding is 
+   [entropy encoding](https://en.wikipedia.org/wiki/Entropy_encoding) which is
+   lossless: a run-length encoding (RLE) algorithm is applied on each
+   block in effect grouping similar frequencies together and inserts
+   length coding zeros, and then uses Huffman coding to compress what
+   is left.
 
 
-### optipng arguments
+## More usage examples with GNU find and GNU parallel
 
-1. `-preserve`: preserve file attributes
-2. `-clobber`: overwrite the existing output and backup files.
+### Example: use bash variables for specifying input and output directories
 
-### gifsicle arguments
-
-1. `--optimize=3`: optimize level 3 combines 1) stores only the
-   changed portion of each image, 2) use transparency to shrink the
-   file further, and 3) try several optimization methods (usually
-   slower, sometimes better results).
-
-## Example usage with GNU find and GNU parallel
-
-### To optimize all images in the directory ``/tmp/test/in`
+To optimize all images in the directory ``/tmp/test/in`
 and save the resulting images to the directory `/tmp/test/out` one
 might use:
 
 ```bash
  sourcedir=\"/tmp/test/in\"
  targetdir=\"/tmp/test/out\"
- find "${sourcedir}" -type f -print0 | parallel -0 ${appname} -i {} -o ${targetdir}{}
+ find "${sourcedir}" -type f -print0 | parallel -0 ./optimize-m-all -i {} -o ${targetdir}{}
  ```
 
 Result:
@@ -204,6 +203,7 @@ Result:
 * `/tmp/test/in/some/sub/dir/image001.jpg => /tmp/test/out/image001.jpg.optimized`
 
 ## Analysis of optimization using R
+
 
 ```R
 ## define header
