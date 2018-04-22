@@ -102,13 +102,13 @@ optimize-m-all -i /in/path -o /out/path -c ~/stats.csv
 ### convert (imagemagick) arguments
 1. `-strip`: see remarks on `jpegtrans` `copy` argument above
 2. `-interlace "plane"`: use "baseline progressive" JPEG interlaced
-   encoding (instead of "baseline sequential" JPEG), use either `line`
-   or `plane`:
+   encoding (instead of "baseline sequential"), use either `line` or
+   `plane`:
 	* `line = scanline: RRR...GGG...BBB...RRR...GGG...BBB...`
 	* `plane:           RRRRRR...GGGGGG...BBBBBB...`
 
-1. [Chroma subsampling](https://en.wikipedia.org/wiki/Chroma_subsampling); imagemagick argument `-sampling-factor 4:2:2`: 
-
+1. [Chroma subsampling](https://en.wikipedia.org/wiki/Chroma_subsampling);
+   imagemagick argument `-sampling-factor 4:2:2`:
 
 | subsampling name | downsampling of luminance: Y | Downsampling of resolution of chroma: Cb(lue) Cr(ed) | net effect on file size | block splitting MCU size |
 | ---------------: | ---------------------------: | ---------------------------------------------------: | ----------------------: | -----------------------: |
@@ -116,18 +116,17 @@ optimize-m-all -i /in/path -o /out/path -c ~/stats.csv
 | 4:2:2            | none                         | halved horizontal                                    | 1/3                     | 16x8                     |
 | 4:4:4            | none                         | none                                                 | 1                       | 8x8                      |
 
-
 2. Block splitting in Minimum Coded Units (MCU)
-3. [DCT quantization](https://en.wikipedia.org/wiki/Quantization_(image_processing)#Quantization_matrices)
-   of blocks; imagemagick argument `-define "jpeg:dct-method=float"`
+3. [DCT quantization](https://en.wikipedia.org/wiki/Quantization_(image_processing)#Quantization_matrices);
+   imagemagick argument `-define "jpeg:dct-method=float"`
    
-   First calculate DCT coefficients, than divide those
-   values with a standardized quantisation matrix, and than round to
-   integers. The rounding is lossy by introducing rounding errors
-   applied to high frequency brightness variation (luminance
-   components). The higher the precision used to round the brightness
-   values, the less the probability of visual degradation
-   becomes. Tradeoff: encoding time
+First calculate DCT coefficients, than divide those values with a
+standardized quantisation matrix, and than round to integers. The
+rounding is lossy by introducing rounding errors applied to high
+frequency brightness variation (luminance components). The higher the
+precision used to round the brightness values, the less the
+probability of visual degradation becomes. Tradeoff for higher
+precision: encoding time and cost.
 
 4. [Entropy encoding](https://en.wikipedia.org/wiki/Entropy_encoding)
    (lossless): apply a run-length encoding (RLE) algorithm on each
@@ -151,8 +150,8 @@ The script reads the source jpeg `Q` value (using `identify`) and
 translates that to `max_jpeg_quality`; if `source Q >
 max_jpeg_quality` it add the argument:
 
-````bash
-convert_args+=(-quality "${max_jpeg_quality}")`
+```bash
+convert_args+=(-quality "${max_jpeg_quality}")
 ```
 
 
