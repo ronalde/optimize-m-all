@@ -107,27 +107,8 @@ optimize-m-all -i /in/path -o /out/path -c ~/stats.csv
 	* `line = scanline: RRR...GGG...BBB...RRR...GGG...BBB...`
 	* `plane:           RRRRRR...GGGGGG...BBBBBB...`
 
-1. [Chroma subsampling](https://en.wikipedia.org/wiki/Chroma_subsampling) (`-sampling-factor hf x vf)`
-2. Block splitting in Minimum Coded Units (MCU)
-3. [DCT quantization](https://en.wikipedia.org/wiki/Quantization_(image_processing)#Quantization_matrices)
-   of blocks: first calculate DCT coefficients, than divide those
-   values with a standardized quantisation matrix, and than round to
-   integers. The rounding is lossy by introducing rounding errors
-   applied to high frequency brightness variation (luminance
-   components). The higher the precision used to round the brightness
-   values, the less the probability of visual degradation
-   becomes. Tradeoff: encoding time
-4. [Entropy encoding](https://en.wikipedia.org/wiki/Entropy_encoding)
-   (lossless): apply a run-length encoding (RLE) algorithm on each
-   block which groups similar frequencies together and inserts length
-   coding zeros, and then use Huffman coding to compress what is left
+1. [Chroma subsampling](https://en.wikipedia.org/wiki/Chroma_subsampling); imagemagick argument `-sampling-factor 4:2:2`: 
 
-1. [Chroma subsampling](https://en.wikipedia.org/wiki/Chroma_subsampling) (`-sampling-factor hf x vf)`:
-   * `4:4:4 (1x1)`: no compression
-   * `4:2:0 (2x2)`: no compression of luminance, : `filesize*-1/2`
-   * `4:2:2 (1x2)`: chroma components are sampled at half the sample
-     rate of luma: the horizontal chroma resolution is halved:
-     `filesize * -1/3` (with little to no visual difference)
 
 | subsampling | downsampling of | Downsampling of resolution of  | net effect       | block splitting |
 | name        | luminance: Y    | chroma: Cb(lue) Cr(ed)         | on file size     | MCU size        |
@@ -136,24 +117,24 @@ optimize-m-all -i /in/path -o /out/path -c ~/stats.csv
 | 4:2:2       | none            | halved horizontal              | * 1/3            | 16x8            |
 | 4:4:4       | none            | none                           | * 1              | 8x8             |
 
-Imagemagick supports both notations:
-* `-sampling-factor 2x1` or
-* `-sampling-factor 4:2:2` 
 
-4. `-define "jpeg:dct-method=float"`: apply quantization using
-   floating point calculations for the discrete cosine transform
-   (DCT), which is the slowest but best; other options are (in
-   incresasing speed and decreasing quality: integer and fast integer)
+2. Block splitting in Minimum Coded Units (MCU)
+3. [DCT quantization](https://en.wikipedia.org/wiki/Quantization_(image_processing)#Quantization_matrices)
+   of blocks; imagemagick argument `-define "jpeg:dct-method=float"`
+   
+   First calculate DCT coefficients, than divide those
+   values with a standardized quantisation matrix, and than round to
+   integers. The rounding is lossy by introducing rounding errors
+   applied to high frequency brightness variation (luminance
+   components). The higher the precision used to round the brightness
+   values, the less the probability of visual degradation
+   becomes. Tradeoff: encoding time
 
-
-
-```
-2x2,1x1,1x1  # 
-2x1,1x1,1x1  # 4:2:2  1/3 compression, no or slight quality loss 
-1x1,1x1,1x1  # 4:4:4  no compression or quality loss
-```
-
-
+4. [Entropy encoding](https://en.wikipedia.org/wiki/Entropy_encoding)
+   (lossless): apply a run-length encoding (RLE) algorithm on each
+   block which groups similar frequencies together and inserts length
+   coding zeros, and then use Huffman coding to compress what is left
+ 
 #### Note on the `-quality` argument
 The default is to use the estimated quality of your input image if it
 can be determined, otherwise 92. When the quality is greater than 90,
