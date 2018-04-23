@@ -19,8 +19,6 @@ find /tmp/test -type f -print0 | \
     parallel -0 do_compress -i {} -o /path/out{}
 ```
 
-See: [More usage examples with GNU find and GNU parallel](#more-usage-examples-with-gnu-find-and-gnu-parallel)
-
 A sample bash loop:
 
 ```
@@ -32,9 +30,11 @@ for infile in "${inpath}"/**/*.{jpg,png}; do
 done
 ```
 
-Run `do_compress --help` or show usage information, or use `-p` to see
-examples for using the script with GNU parallel.
+Run `do_compress --help` or show usage information.
 
+Also see:
+* [More usage examples with GNU find and GNU parallel](#more-usage-examples-with-gnu-find-and-gnu-parallel)
+* [Example: analysis of optimization results in generated csv file using R](#more-usage-examples-with-gnu-find-and-gnu-parallel)
 
 ## File formats and requirements
 
