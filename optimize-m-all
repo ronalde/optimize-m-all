@@ -96,9 +96,13 @@ See README.md for more information.
 function ret_humansize() {
     ## return human version of number of bytes ($1)
     bytes="$1"
-    [[ "${bytes}x" == "x" ]] && bytes=0
-    #numfmt --to=iec --suffix=B --format="%.1f" "${bytes}"
-    numfmt --to=iec --format="%.1f" "${bytes}"
+    sign=""
+    if (( bytes < 0 )); then
+	sign="-"
+	bytes=$(( bytes * -1 ))
+    fi
+    formatted_bytes="$(numfmt --to=iec --format="%.1f" "${bytes}")"
+    printf "%s%s"  "${sign}" "${formatted_bytes}"
 }
 
 function optimize_image() {
@@ -226,7 +230,7 @@ function optimize_image() {
 	    ;;
 	jpg_optimize)
 	    ## additional arguments
-	    [[ "${arg_debug}x" == "x" ]] && \
+	    if [[ "${arg_debug}x" == "x" ]];then
 		jpegtran_args+=(-verbose)
 	    fi
 	    jpegtran_args+=(-outfile "${outputfile}")
@@ -356,13 +360,14 @@ function ret_effectiveness() {
 		   "${file_original}"  "${file_optimized}"
 	return ${err_output_file}
     fi
-    bytes_original="$(stat --printf="%s" "${file_original}")"
-    bytes_optimized="$(stat --printf="%s" "${file_optimized}")"
-    bytes_reduction=$(( bytes_original - bytes_optimized ))
+    bytes_original="$(stat --printf="%s" "${file_original}")" || return "${err_input_file}"
+    bytes_optimized="$(stat --printf="%s" "${file_optimized}")" || return "${err_output_file}"
+    bytes_reduction=$(( bytes_original - bytes_optimized ))  || return "${err_cmd_optimize}"
+    #declare -p 1>&2 bytes_original bytes_optimized bytes_reduction
     if [[ "${arg_humansizes}x" != "x" ]]; then
-	printf -v label_bytes_original "$(ret_humansize "${bytes_original}")"
-	printf -v label_bytes_optimized  "$(ret_humansize "${bytes_optimized}")"
-	printf -v label_bytes_reduction "$(ret_humansize "${bytes_reduction}")"
+	printf -v label_bytes_original "%s" "$(ret_humansize "${bytes_original}")" 
+	printf -v label_bytes_optimized "%s" "$(ret_humansize "${bytes_optimized}")" 
+	printf -v label_bytes_reduction "%s" "$(ret_humansize "${bytes_reduction}")"
     else
 	label_bytes_original="${bytes_original}"
 	label_bytes_optimized="${bytes_optimized}"
@@ -461,9 +466,9 @@ function main() {
     t_start_errinp="${t_input_err_file} => ${t_output_file}"
     t_start_errout="${t_input_file} => ${t_output_err_file}"
     t_error="  ${cerr}error${std}"
-    t_effect_negative="${t_start_normal} = ${cneg}%s ${t_label_size} added!${std} (${t_perc_neg}).\n"
+    t_effect_negative="${t_start_normal} = ${cneg}%s ${t_label_size}${std} (${t_perc_neg}).\n"
     t_effect_zero="${t_start_normal} = ${ceql}%s${std} ${t_label_size}.\n"
-    t_effect_positive="${t_start_normal} = ${cpos}%s${std} ${t_label_size} reduced (${t_perc_pos}).\n"
+    t_effect_positive="${t_start_normal} = ${cpos}%s${std} ${t_label_size}(${t_perc_pos}).\n"
     t_err_input_file="${t_input_file} : ${t_error}; ${bold}${s_err_input_file}${std}.\n"
     t_err_output_file="${t_input_file} => ${t_output_err_file} : ${t_error}; ${bold}${s_err_output_file}${std}.\n"
     t_err_input_type="${t_start_errinp} : ${t_error}; ${white}${s_err_input_type}${std}.\n"
@@ -511,7 +516,7 @@ function main() {
 	${err_usage})
 	    display_usageinfo
 	    return
-
+	    ;;
 	*) ## bug
 	    exit ${err_bug}
 	    ;;
