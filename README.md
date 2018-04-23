@@ -145,7 +145,7 @@ convert_args+=(-quality "${max_jpeg_quality}")
 | 4:2:2            | none                         | halved horizontal                                    | 1/3                     | 16x8                     |
 | 4:4:4            | none                         | none                                                 | 1                       | 8x8                      |
 
-5. `-define "jpeg:dct-method=float"`; After applying sub saampling and
+5. `-define "jpeg:dct-method=float"`; After applying sub sampling and
     block splitting in Minimum Coded Units (MCU), 
 	[DCT quantization](https://en.wikipedia.org/wiki/Quantization_(image_processing)#Quantization_matrices)
 	is applied. First DCT coefficients are calculated, than those
@@ -168,14 +168,13 @@ convert_args+=(-quality "${max_jpeg_quality}")
 
 ### Example: use bash variables for specifying input and output directories
 
-To optimize all images in the directory ``/tmp/test/in`
-and save the resulting images to the directory `/tmp/test/out` one
-might use:
+To optimize all images in the directory `/tmp/test/in` and save the
+resulting images to the directory `/tmp/test/out` one might use:
 
 ```bash
  sourcedir=\"/tmp/test/in\"
  targetdir=\"/tmp/test/out\"
- find "${sourcedir}" -type f -print0 | parallel -0 ./optimize-m-all -i {} -o ${targetdir}{}
+ find "${sourcedir}" -type f -regextype posix-extended -regex '.*\.(jp[e]*[g]*|jfi[f]*|jif|png|gif)' -print0 | parallel -0 ./optimize-m-all -i {} -o ${targetdir}{}
  ```
 
 Result:
@@ -193,7 +192,7 @@ find "${sourcedir}" -type f -print0 | parallel -0 ${appname} -i {} -o ${targetdi
 Result:
 * `/tmp/test/in/some/sub/dir/image001.jpg => /tmp/test/out/image001.jpg`
 
-### Example: add an extra suffix to the output files
+### Example: strip path and add an extra suffix to the output files
 
 ```
 find "${sourcedir}" -type f -print0 | parallel -0 ${appname} -i {} -o ${targetdir}{/.}.optimized
@@ -202,13 +201,30 @@ find "${sourcedir}" -type f -print0 | parallel -0 ${appname} -i {} -o ${targetdi
 Result:
 * `/tmp/test/in/some/sub/dir/image001.jpg => /tmp/test/out/image001.jpg.optimized`
 
-## Analysis of optimization using R
+## Example: analysis of optimization results in generated csv file using R
 
+
+1. perform optimization and store results in a csv file:
+```bash
+find /var/www/wp-uploads -type f -print0 | parallel -0 ${appname} -i {} -o /tmp/{} -c stats.csv
+```
+2. Use R to import hte csv, add some columns, sumarrize the results and plot the effectiveness per file type:
 
 ```R
 ## define header
 colNames <- c("file_original","file_type","file_optimized","bytes_original","bytes_optimized","bytes_reduction","percentage_reduction")
 m <- read.csv(file="stats.csv", sep=",", quote="\"", dec=".", header=FALSE, col.names=colNames)
+## display summary
 summary(m)
 
+## add human readable sizes (KiB)
+m$hbytes_original <- m$bytes_original / 1024
+m$hbytes_optimized <- m$bytes_optimized / 1024
+m$hbytes_reduction <- m$bytes_reduction / 1024
+
+## plot per file type
+library("ggplot2")
+perc_plot <- ggplot(m, aes(x=hbytes_original, y=percentage_reduction, size = hbytes_optimized, colour=file_type)) + labs(title="Optimization effectiveness by file size and type", x = "Original file size (KiB)", y = "Percentage reduced (%)", colour="File type", size="Size of reduction (KiB)")  + geom_point()  + facet_wrap(~file_type)
+## display
+perc_plot
 ```
