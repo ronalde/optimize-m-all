@@ -6,7 +6,8 @@ optionally (re-)compression of image files.
 The script is designed to be used in conjunction with [GNU
 find](https://www.gnu.org/software/findutils/manual/html_mono/find.html)
 and [GNU parallel](https://www.gnu.org/software/parallel/) to do
-(massive) batch jobs, while analysing the results using [R](https://www.r-project.org/).
+(massive) batch jobs, after which the saved results could be analysed
+with [R](https://www.r-project.org/).
 
 
 ## Usage
@@ -16,7 +17,7 @@ be used together with gnu parallel:
 
 ```bash
 find /tmp/test -type f -print0 | \
-    parallel -0 do_compress -i {} -o /path/out{}
+    parallel -0 optimize-m-all -i {} -o /path/out{}
 ```
 
 A sample bash loop:
@@ -26,15 +27,43 @@ inpath="/tmp/test"
 outpath="/path/out"
 for infile in "${inpath}"/**/*.{jpg,png}; do
 	outfile="${outpath}/${infile//${inpath}}"
-	do_compress -i "${infile}" -o "${outfile}" 
+	optimize-m-all -i "${infile}" -o "${outfile}" 
 done
 ```
 
-Run `do_compress --help` or show usage information.
+Run `optimize-m-all --help` to show usage information.
 
 Also see:
 * [More usage examples with GNU find and GNU parallel](#more-usage-examples-with-gnu-find-and-gnu-parallel)
 * [Example: analysis of optimization results in generated csv file using R](#example-analysis-of-optimization-results-in-generated-csv-file-using-r)
+
+## Arguments
+
+### Required arguments
+* `-i|--inputfile PATH`: Path to the source image file.
+* `-o|--outputfile PATH`: Path to the target optimized file.
+
+### Optional arguments
+* `-c|--csvfile PATH`: Save the raw results of the script in csv file
+  `PATH`, which is created when neccessary.
+
+  NOTE: the script appends information to the csv file, so be sure to
+  clear or remove it in between (test) runs.
+  
+* `-f|--force`: Overwrite existing target files (normal behaviour is
+  to skip optimization when an existing target file is found).
+* `-r|--recompress QVAL`: Set `QVAL` to the maximum JPEG-compression
+   level desired, ie between 0 and 100. The script determines the
+   quality level of the source file and applies lossy (re-)compression
+   when it exceeds that of `QVAL`. Otherwise lossless optimization is
+   applied as usual.
+* `-n|--dryrun` Don't do write to files, but display the savings in
+  file sizes the compression can achieve.
+* `-w|--wide`: Use the full screen width to format screen output.
+* `-h|--humanize`: Uses humanized labels for the screen output of
+  sizes (ie 1024 to 1.0KiB).
+* `-d|--debug`: Display lots of info.
+
 
 ## File formats and requirements
 
