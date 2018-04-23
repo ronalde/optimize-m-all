@@ -6,7 +6,7 @@ optionally (re-)compression of image files.
 The script is designed to be used in conjunction with [GNU
 find](https://www.gnu.org/software/findutils/manual/html_mono/find.html)
 and [GNU parallel](https://www.gnu.org/software/parallel/) to do
-(massive) batch jobs.
+(massive) batch jobs, while analysing the results using [R](https://www.r-project.org/).
 
 
 ## Usage
@@ -34,7 +34,7 @@ Run `do_compress --help` or show usage information.
 
 Also see:
 * [More usage examples with GNU find and GNU parallel](#more-usage-examples-with-gnu-find-and-gnu-parallel)
-* [Example: analysis of optimization results in generated csv file using R](#more-usage-examples-with-gnu-find-and-gnu-parallel)
+* [Example: analysis of optimization results in generated csv file using R](#example-analysis-of-optimization-results-in-generated-csv-file-using-r)
 
 ## File formats and requirements
 
