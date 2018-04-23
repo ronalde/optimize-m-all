@@ -324,11 +324,8 @@ function analyze_commandline_args() {
 		shift
 		continue
 		;;
-	    -p|--help-parallel) 
-		help_parallel
-		exit
-		;;
-	    -\?|--help) 
+	    -\?|--help)
+		display_usageinfo
 		return ${err_usage}
 		;;
             --)
